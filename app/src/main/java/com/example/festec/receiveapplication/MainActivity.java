@@ -147,60 +147,10 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    class audTask extends AsyncTask<Object, Void, Void> {
-        EmergencyProtocol protocol;
-        BaseMessage baseMessage;
 
 
-        @Override
-        protected void onPreExecute() {
-            initAudioTracker();
-        }
-
-        @Override
-        protected Void doInBackground(Object... objects) {
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            audioTrk.stop();
-            audioTrk.release();
-            super.onPostExecute(aVoid);
-        }
-    }
 
 
-    private AudioTrack audioTrk = null;
-
-    private void initAudioTracker() {
-        //扬声器播放
-        int streamType = AudioManager.STREAM_MUSIC;
-        //播放的采样频率 和录制的采样频率一样
-        int sampleRate = 44100;
-        //和录制的一样的
-        int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-        //流模式
-        int mode = AudioTrack.MODE_STREAM;
-        //录音用输入单声道  播放用输出单声道
-        int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
-        int recBufSize = AudioTrack.getMinBufferSize(
-                sampleRate,
-                channelConfig,
-                audioFormat);
-        System.out.println("****playRecBufSize = " + recBufSize);
-        audioTrk = new AudioTrack(
-                streamType,
-                sampleRate,
-                channelConfig,
-                audioFormat,
-                recBufSize,
-                mode);
-        audioTrk.setStereoVolume(AudioTrack.getMaxVolume(),
-                AudioTrack.getMaxVolume());
-
-    }
 
     //创建监听权限的接口对象
     PermissionUtil.IPermissionsResult permissionsResult = new PermissionUtil.IPermissionsResult() {
@@ -221,4 +171,6 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         PermissionUtil.getInstance().onRequestPermissionsResult(this, requestCode, permissions, grantResults);
     }
+
+
 }

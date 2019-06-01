@@ -26,7 +26,7 @@ public class Client {
     private static final int RECEIVE_AUD = 641;
     private static final int CANCEL_AUD = 444;
     // TCP
-    private String serverIP = "192.168.0.116";
+    private String serverIP;
     private int serverPort = 10041;
     private Socket clientSocket = null;
     private InputStream is = null;
@@ -71,9 +71,9 @@ public class Client {
         //扬声器播放
         int streamType = AudioManager.STREAM_MUSIC;
         //播放的采样频率 和录制的采样频率一样
-        int sampleRate = 44100;
+        int sampleRate = 100;
         //和录制的一样的
-        int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+        int audioFormat = AudioFormat.ENCODING_PCM_8BIT;
         //流模式
         int mode = AudioTrack.MODE_STREAM;
         //录音用输入单声道  播放用输出单声道
@@ -87,7 +87,7 @@ public class Client {
                 sampleRate,
                 channelConfig,
                 audioFormat,
-                recBufSize * 4,
+                recBufSize*2,
                 mode);
 
     }
@@ -168,6 +168,7 @@ public class Client {
                         String line = null;
                         while ((line = br.readLine()) != null) {
                             // ignore
+                            Log.d(TAG, "心跳接收：\t" + line);
 //                            System.out.println("心跳接收：\t" + line);
                         }
                     } else {
@@ -265,6 +266,7 @@ public class Client {
                             Log.d("waibao", mac + " 收到图片消息");
                             break;
                         default:
+                            Log.d(TAG, "收到未知消息");
                             break;
                     }
                 }
