@@ -272,8 +272,10 @@ public class Client {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            audioTrk.stop();
-            audioTrk.release();
+            if (audioTrk != null) {
+                audioTrk.stop();
+                audioTrk.release();
+            }
         }
     }
 
