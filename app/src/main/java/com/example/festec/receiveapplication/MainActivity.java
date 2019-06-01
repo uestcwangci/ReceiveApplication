@@ -2,22 +2,31 @@ package com.example.festec.receiveapplication;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Build.VERSION;
+import android.os.Build.VERSION_CODES;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Messenger;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
@@ -29,6 +38,7 @@ import com.example.festec.receiveapplication.utils.PermissionUtil;
 
 import java.io.ByteArrayOutputStream;
 
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "waibao";
     private static final int RECEIVE_TEXT = 639;
@@ -39,16 +49,8 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView textView, hintView;
     private ImageView imgView;
+    private ToggleButton startService;
 
-
-
-    // 要申请的权限
-    private final String[] permissions = new String[]{
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.WAKE_LOCK,
-            Manifest.permission.MODIFY_AUDIO_SETTINGS,
-            Manifest.permission.RECORD_AUDIO};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,11 +59,49 @@ public class MainActivity extends AppCompatActivity {
         hintView = findViewById(R.id.receivrHint);
         textView = findViewById(R.id.text);
         imgView = findViewById(R.id.img);
+        startService = findViewById(R.id.button);
         imgView.setVisibility(View.INVISIBLE);
         textView.setVisibility(View.INVISIBLE);
+        // 要申请的权限
+        String[] permissions = null;
+        if (VERSION.SDK_INT >= VERSION_CODES.P) {
+            permissions = new String[]{
+                    Manifest.permission.ACCESS_WIFI_STATE,
+                    Manifest.permission.CHANGE_WIFI_STATE,
+                    Manifest.permission.WAKE_LOCK,
+                    Manifest.permission.MODIFY_AUDIO_SETTINGS,
+                    Manifest.permission.RECORD_AUDIO,
+                    Manifest.permission.FOREGROUND_SERVICE};
+        } else {
+            permissions = new String[]{
+                    Manifest.permission.ACCESS_WIFI_STATE,
+                    Manifest.permission.CHANGE_WIFI_STATE,
+                    Manifest.permission.WAKE_LOCK,
+                    Manifest.permission.MODIFY_AUDIO_SETTINGS,
+                    Manifest.permission.RECORD_AUDIO};
+        }
         PermissionUtil.getInstance().chekPermissions(this, permissions, permissionsResult);
-        Client client = new Client("192.168.0.116", 10041, "1", 6788, handler);
-        client.start();
+
+        startService.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    Intent intent = new Intent(MainActivity.this, ForeService.class);
+                    intent.putExtra("messenger", new Messenger(handler));
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        startForegroundService(intent);
+                    } else {
+                        startService(intent);
+                    }
+                } else {
+                    Intent stop = new Intent(MainActivity.this, ForeService.class);
+                    stopService (stop);
+                }
+            }
+        });
+
+
+
     }
 
     @SuppressLint("HandlerLeak")
@@ -130,7 +170,6 @@ public class MainActivity extends AppCompatActivity {
             super.onPostExecute(aVoid);
         }
     }
-
 
 
     private AudioTrack audioTrk = null;

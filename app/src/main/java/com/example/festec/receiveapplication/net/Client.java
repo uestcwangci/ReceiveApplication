@@ -5,6 +5,7 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Messenger;
 import android.util.Log;
 
 import com.example.festec.receiveapplication.message.BaseMessage;
@@ -33,7 +34,8 @@ public class Client {
     private String mac;
     private boolean isTcpRun = false;// 连接状态
 
-    private Handler mainHandler;
+    //    private Handler mainHandler;
+    private Messenger mMessenger;
 
     private AudioTrack audioTrk = null;
 
@@ -46,12 +48,17 @@ public class Client {
     private long lastSendTime; //最后一次发送数据的时间
 
 
-    public Client(String tcpServer, int tcpPort, String mac, int udpPort, Handler handler) {
+    public Client(String tcpServer, int tcpPort, String mac, int udpPort, Messenger messenger) {
         this.serverIP = tcpServer;
         this.serverPort = tcpPort;
         this.mac = mac;
         this.udpPort = udpPort;
-        this.mainHandler = handler;
+        this.mMessenger = messenger;
+    }
+
+    public void stop() {
+        tcpClose();
+        udpClose();
     }
 
     public void start() {
@@ -176,21 +183,33 @@ public class Client {
 
 
     public void tcpClose() {
-        try {
-            System.out.println(mac + " 断开连接");
-            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
-            bw.write("quit" + udpPort);
-            bw.newLine();
-            bw.flush();
-            if (clientSocket != null) {
-                clientSocket.close();
-            }
-            if (isTcpRun) {
-                isTcpRun = false;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        System.out.println(mac + " 断开连接");
+                        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
+                        bw.write("quit" + udpPort);
+                        bw.newLine();
+                        bw.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            if (clientSocket != null) {
+                                clientSocket.close();
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        if (isTcpRun) {
+                            isTcpRun = false;
+                        }
+                    }
+                }
+            }).start();
+
+
     }
 
     public void udpStart() {
@@ -210,7 +229,7 @@ public class Client {
             udpSocket = new DatagramSocket(udpPort);//绑定端口进行数据监听
             DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);//数据接收包囊
             initAudioTracker();
-
+            audioTrk.play();
             while (isUdpRun) {
                 udpSocket.receive(receivePacket);//接收数据.阻塞式
                 Log.d(TAG, "UDP from " + receivePacket.getAddress().getHostAddress() + " : " + receivePacket.getPort());
@@ -223,25 +242,11 @@ public class Client {
                     switch ((baseMessage.getDataType())) {
                         case 0x01:
                             Log.d("waibao", mac + " 收到音频消息");
-                            msg.what = RECEIVE_AUD;
-                            mainHandler.sendMessage(msg);
-                            audioTrk.play();
-
                             byte[] audBytes = baseMessage.getData();
                             audioTrk.write(audBytes, 0, audBytes.length);
-//                            String checkStop = null;
-//                            if (audBytes.length > 3) {
-//                                checkStop = new String(audBytes, 0, 4);
-//                            }
-//                            if (!"stop".equalsIgnoreCase(checkStop)) {
-//                                msg.what = RECEIVE_AUD;
-//                                mainHandler.sendMessage(msg);
-//                            } else {
-////                                audioTrk.stop();
-//                                audioTrk.release();
-//                                msg.what = CANCEL_AUD;
-//                                mainHandler.sendMessage(msg);
-//                            }
+                            msg.what = RECEIVE_AUD;
+                            mMessenger.send(msg);
+
 
                             break;
                         case 0x02:
@@ -250,13 +255,13 @@ public class Client {
                         case 0x03:
                             msg.what = RECEIVE_TEXT;
                             msg.obj = new String(baseMessage.getData());
-                            mainHandler.sendMessage(msg);
+                            mMessenger.send(msg);
                             Log.d("waibao", mac + " 收到文字消息: " + new String(baseMessage.getData()));
                             break;
                         case 0x04:
                             msg.what = RECEIVE_IMG;
                             msg.obj = protocol;
-                            mainHandler.sendMessage(msg);
+                            mMessenger.send(msg);
                             Log.d("waibao", mac + " 收到图片消息");
                             break;
                         default:
@@ -266,6 +271,9 @@ public class Client {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            audioTrk.stop();
+            audioTrk.release();
         }
     }
 
