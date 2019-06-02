@@ -18,11 +18,14 @@ import android.os.Messenger;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -47,8 +50,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int CANCEL_AUD = 444;
 
 
+    private int udpPort;
+
     private TextView textView, hintView;
     private ImageView imgView;
+    private EditText editText;
     private ToggleButton startService;
     private ToggleButton startAud;
 
@@ -60,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         hintView = findViewById(R.id.receivrHint);
         textView = findViewById(R.id.text);
         imgView = findViewById(R.id.img);
+        editText = findViewById(R.id.editPort);
         startService = findViewById(R.id.button);
         startAud = findViewById(R.id.bt_aud);
         imgView.setVisibility(View.INVISIBLE);
@@ -83,13 +90,43 @@ public class MainActivity extends AppCompatActivity {
                     Manifest.permission.RECORD_AUDIO};
         }
         PermissionUtil.getInstance().chekPermissions(this, permissions, permissionsResult);
+        TextWatcher afterTextChangedListener = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // ignore
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // ignore
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (!TextUtils.isEmpty(editText.getText())) {
+                    udpPort = Integer.parseInt(editText.getText().toString());
+                }
+            }
+        };
+        editText.addTextChangedListener(afterTextChangedListener);
+
 
         startService.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (TextUtils.isEmpty(editText.getText())) {
+                    startService.setChecked(false);
+                    return;
+                }
+                if (udpPort == 0) {
+                    startService.setChecked(false);
+                    return;
+                }
+
                 if (isChecked) {
                     Intent intent = new Intent(MainActivity.this, ForeService.class);
                     intent.putExtra("messenger", new Messenger(handler));
+                    intent.putExtra("port", udpPort);
                     if (Build.VERSION.SDK_INT >= 26) {
                         startForegroundService(intent);
                     } else {
@@ -98,6 +135,9 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Intent stop = new Intent(MainActivity.this, ForeService.class);
                     stopService (stop);
+                    hintView.setText("消息提示");
+                    textView.setVisibility(View.INVISIBLE);
+                    imgView.setVisibility(View.INVISIBLE);
                 }
             }
         });
@@ -105,8 +145,17 @@ public class MainActivity extends AppCompatActivity {
         startAud.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (TextUtils.isEmpty(editText.getText())) {
+                    startAud.setChecked(false);
+                    return;
+                }
+                if (udpPort == 0) {
+                    startAud.setChecked(false);
+                    return;
+                }
                 if (isChecked) {
                     Intent intent = new Intent(MainActivity.this, AudService.class);
+                    intent.putExtra("port", udpPort);
                     if (Build.VERSION.SDK_INT >= 26) {
                         startForegroundService(intent);
                     } else {
