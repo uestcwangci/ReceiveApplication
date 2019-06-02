@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView textView, hintView;
     private ImageView imgView;
     private ToggleButton startService;
+    private ToggleButton startAud;
 
 
     @Override
@@ -60,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         textView = findViewById(R.id.text);
         imgView = findViewById(R.id.img);
         startService = findViewById(R.id.button);
+        startAud = findViewById(R.id.bt_aud);
         imgView.setVisibility(View.INVISIBLE);
         textView.setVisibility(View.INVISIBLE);
         // 要申请的权限
@@ -95,6 +97,23 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } else {
                     Intent stop = new Intent(MainActivity.this, ForeService.class);
+                    stopService (stop);
+                }
+            }
+        });
+
+        startAud.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    Intent intent = new Intent(MainActivity.this, AudService.class);
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        startForegroundService(intent);
+                    } else {
+                        startService(intent);
+                    }
+                } else {
+                    Intent stop = new Intent(MainActivity.this, AudService.class);
                     stopService (stop);
                 }
             }

@@ -44,9 +44,10 @@ public class ForeService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d("waibao", "onStartCommand: ");
         if (mMessenger == null) {
             mMessenger = (Messenger) intent.getExtras().get("messenger");
-            client = new Client("192.168.78.10", 10041, mMessenger);
+            client = new Client("192.168.0.116", 10041, 7788, mMessenger);
         }
         client.start();
         return super.onStartCommand(intent, flags, startId);

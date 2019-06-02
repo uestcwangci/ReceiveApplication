@@ -81,6 +81,12 @@ public class ReceiveActivity extends AppCompatActivity {
         ToggleButton button = findViewById(R.id.jianting);
 
 
+        try {
+            datagramSocket = new DatagramSocket(7777);
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
+
         final Thread receiveThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -121,11 +127,6 @@ public class ReceiveActivity extends AppCompatActivity {
             }
         });
 
-        try {
-            datagramSocket = new DatagramSocket(7777);
-        } catch (SocketException e) {
-            e.printStackTrace();
-        }
 
 
     }

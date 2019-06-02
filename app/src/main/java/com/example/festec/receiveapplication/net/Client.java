@@ -19,7 +19,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
+import java.util.Enumeration;
 
 public class Client {
     private static final String TAG = "waibao";
@@ -44,21 +47,22 @@ public class Client {
     // UDP
 
     private boolean isUdpRun = true;
-    private MulticastSocket multicastSocket = null;
-    private int udpPort = 10012; // 组播侦听端口
-    private String mulIp = "239.0.1.25";//组播地址 使用D类地址
-    private InetAddress address = null;
-    private static int BUFF_SIZE = 4096;
+    private DatagramSocket socket;
+    private int udpPort; // 组播侦听端口
+    private static int BUFF_SIZE;
+    private byte[] buffer;
 
 
 
     private long lastSendTime; //最后一次发送数据的时间
 
 
-    public Client(String tcpServer, int tcpPort, Messenger messenger) {
+    public Client(String tcpServer, int tcpPort, int udpPort, Messenger messenger) {
         this.serverIP = tcpServer;
         this.serverPort = tcpPort;
+        this.udpPort = udpPort;
         this.mMessenger = messenger;
+        this.mac = getMacAddress();
     }
 
     public void stop() {
@@ -92,8 +96,13 @@ public class Client {
                 sampleRate,
                 channelConfig,
                 audioFormat,
-                recBufSize*2,
+                recBufSize,
                 mode);
+        audioTrk.setStereoVolume(AudioTrack.getMaxVolume(),
+                AudioTrack.getMaxVolume());
+        BUFF_SIZE = recBufSize + 100;
+        buffer = new byte[BUFF_SIZE];
+
 
     }
 
@@ -115,7 +124,9 @@ public class Client {
                     clientSocket.setKeepAlive(true);
                     Log.d(TAG, "TCP连接成功");
                     BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
-                    bw.write("applyMac");
+                    bw.write(mac + "|"
+                            + clientSocket.getLocalAddress().toString().replaceFirst("/", "")
+                            + "|" + udpPort);
                     bw.newLine();
                     bw.flush();
                     new Thread(new KeepAliveWatchDog()).start();  //保持长连接的线程，每隔5秒项服务器发一个一个保持连接的心跳消息
@@ -169,16 +180,12 @@ public class Client {
                 try {
                     InputStream in = clientSocket.getInputStream();
                     if (in.available() > 0) {
-                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
-                        String line = null;
-                        while ((line = br.readLine()) != null) {
-                            // ignore
-                            if (!"server heart pack".equalsIgnoreCase(line)) {
-                                mac = line;
-                                Log.d(TAG, "mac:" + mac);
-                            }
-//                            Log.d(TAG, "心跳接收：\t" + line);
-                        }
+//                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+//                        String line = null;
+//                        while ((line = br.readLine()) != null) {
+//                            // ignore
+////                            Log.d(TAG, "心跳接收：\t" + line);
+//                        }
                     } else {
                         Thread.sleep(10);
                     }
@@ -229,29 +236,18 @@ public class Client {
             public void run() {
                 // 接收数据时需要指定监听的端口号
                 try {
-                    multicastSocket = new MulticastSocket(udpPort);
-                    // 创建组播ID地址
-                    address = InetAddress.getByName(mulIp);
-                    // 加入地址
-                    multicastSocket.joinGroup(address);
-                    Log.d(TAG, "加入组播");
+                    socket = new DatagramSocket(udpPort);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 isUdpRun = true;
-                if (multicastSocket == null)
-                    return;
                 initAudioTracker();
-                DatagramPacket datagramPacket = new DatagramPacket(new byte[BUFF_SIZE], BUFF_SIZE);
                 audioTrk.play();
-                while (isUdpRun) {
+                while (isUdpRun && socket != null && !socket.isClosed()) {
                     try {
                         // 接收数据，同样会进入阻塞状态
-                        if (multicastSocket != null) {
-                            multicastSocket.receive(datagramPacket);
-                        } else {
-                            Log.d(TAG, "socket is null");
-                        }
+                        DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(datagramPacket);
                         Log.d(TAG, "UDP from " + datagramPacket.getAddress().getHostAddress() + " : " + datagramPacket.getPort());
                         byte[] receiveBytes = datagramPacket.getData();
                         EmergencyProtocol protocol = UnPackEmergencyProtocol.unPack(receiveBytes,
@@ -262,8 +258,7 @@ public class Client {
                             switch ((baseMessage.getDataType())) {
                                 case 0x01:
                                     Log.d("waibao", mac + " 收到音频消息");
-                                    byte[] audBytes = baseMessage.getData();
-                                    audioTrk.write(audBytes, 0, audBytes.length);
+                                    audioTrk.write(baseMessage.getData(), 0, baseMessage.getDataLength());
                                     msg.what = RECEIVE_AUD;
                                     mMessenger.send(msg);
                                     break;
@@ -293,14 +288,6 @@ public class Client {
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     } finally {
-                        try {
-                            if (multicastSocket != null) {
-                                multicastSocket.leaveGroup(InetAddress.getByName(mulIp));
-                                multicastSocket.close();
-                            }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
                         if (audioTrk != null && audioTrk.getState() == AudioRecord.STATE_INITIALIZED) {
                             audioTrk.stop();
                             audioTrk.release();
@@ -316,6 +303,65 @@ public class Client {
     public void udpClose() {
         isUdpRun = false;
         System.out.println("udp退出监听");
+    }
+
+    /**
+     * 根据IP地址获取MAC地址
+     * @return
+     */
+    private String getMacAddress() {
+        String strMacAddr = null;
+        try {
+            // 获得IpD地址
+            InetAddress ip = getLocalInetAddress();
+            byte[] b = NetworkInterface.getByInetAddress(ip)
+                    .getHardwareAddress();
+            StringBuilder buffer = new StringBuilder();
+            for (int i = 0; i < b.length; i++) {
+                if (i != 0) {
+                    buffer.append(':');
+                }
+                String str = Integer.toHexString(b[i] & 0xFF);
+                buffer.append(str.length() == 1 ? 0 + str : str);
+            }
+            strMacAddr = buffer.toString().toUpperCase();
+        } catch (Exception e) {
+            // ignore
+        }
+        return strMacAddr;
+    }
+    /**
+     * 获取移动设备本地IP
+     * @return
+     */
+    private static InetAddress getLocalInetAddress() {
+        InetAddress ip = null;
+        try {
+            // 列举
+            Enumeration<NetworkInterface> en_netInterface = NetworkInterface
+                    .getNetworkInterfaces();
+            while (en_netInterface.hasMoreElements()) {// 是否还有元素
+                NetworkInterface ni = (NetworkInterface) en_netInterface
+                        .nextElement();// 得到下一个元素
+                Enumeration<InetAddress> en_ip = ni.getInetAddresses();// 得到一个ip地址的列举
+                while (en_ip.hasMoreElements()) {
+                    ip = en_ip.nextElement();
+                    if (!ip.isLoopbackAddress()
+                            && !ip.getHostAddress().contains(":"))
+                        break;
+                    else
+                        ip = null;
+                }
+
+                if (ip != null) {
+                    break;
+                }
+            }
+        } catch (SocketException e) {
+
+            e.printStackTrace();
+        }
+        return ip;
     }
 
 }
