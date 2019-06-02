@@ -99,9 +99,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-
-
-
     }
 
     @SuppressLint("HandlerLeak")
@@ -147,10 +144,12 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-
-
-
-
+    @Override
+    protected void onDestroy() {
+        Intent stop = new Intent(MainActivity.this, ForeService.class);
+        stopService (stop);
+        super.onDestroy();
+    }
 
     //创建监听权限的接口对象
     PermissionUtil.IPermissionsResult permissionsResult = new PermissionUtil.IPermissionsResult() {

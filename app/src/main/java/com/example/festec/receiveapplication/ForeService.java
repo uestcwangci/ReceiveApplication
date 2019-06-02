@@ -46,7 +46,7 @@ public class ForeService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (mMessenger == null) {
             mMessenger = (Messenger) intent.getExtras().get("messenger");
-            client = new Client("192.168.99.168", 10041, mMessenger);
+            client = new Client("192.168.78.10", 10041, mMessenger);
         }
         client.start();
         return super.onStartCommand(intent, flags, startId);

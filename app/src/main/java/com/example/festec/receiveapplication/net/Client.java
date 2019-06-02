@@ -45,9 +45,10 @@ public class Client {
 
     private boolean isUdpRun = true;
     private MulticastSocket multicastSocket = null;
-    private int udpPort = 8888; // 组播侦听端口
-    private String mulIp = "244.0.0.12";//组播地址 使用D类地址
-    private byte[] buffer; // 缓存
+    private int udpPort = 10012; // 组播侦听端口
+    private String mulIp = "239.0.1.25";//组播地址 使用D类地址
+    private InetAddress address = null;
+    private static int BUFF_SIZE = 4096;
 
 
 
@@ -58,7 +59,6 @@ public class Client {
         this.serverIP = tcpServer;
         this.serverPort = tcpPort;
         this.mMessenger = messenger;
-        this.buffer = new byte[4096];
     }
 
     public void stop() {
@@ -173,8 +173,9 @@ public class Client {
                         String line = null;
                         while ((line = br.readLine()) != null) {
                             // ignore
-                            if (!"heart".equalsIgnoreCase(line)) {
+                            if (!"server heart pack".equalsIgnoreCase(line)) {
                                 mac = line;
+                                Log.d(TAG, "mac:" + mac);
                             }
 //                            Log.d(TAG, "心跳接收：\t" + line);
                         }
@@ -195,11 +196,13 @@ public class Client {
                 @Override
                 public void run() {
                     try {
-                        System.out.println(mac + " 断开连接");
-                        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
-                        bw.write("quit" + mac);
-                        bw.newLine();
-                        bw.flush();
+                        Log.d(TAG, mac + " 断开连接");
+                        if (os != null) {
+                            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
+                            bw.write("quit" + mac);
+                            bw.newLine();
+                            bw.flush();
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     } finally {
@@ -228,7 +231,7 @@ public class Client {
                 try {
                     multicastSocket = new MulticastSocket(udpPort);
                     // 创建组播ID地址
-                    InetAddress address = InetAddress.getByName(mulIp);
+                    address = InetAddress.getByName(mulIp);
                     // 加入地址
                     multicastSocket.joinGroup(address);
                     Log.d(TAG, "加入组播");
@@ -239,12 +242,16 @@ public class Client {
                 if (multicastSocket == null)
                     return;
                 initAudioTracker();
-                DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length);
+                DatagramPacket datagramPacket = new DatagramPacket(new byte[BUFF_SIZE], BUFF_SIZE);
                 audioTrk.play();
                 while (isUdpRun) {
                     try {
                         // 接收数据，同样会进入阻塞状态
-                        multicastSocket.receive(datagramPacket);
+                        if (multicastSocket != null) {
+                            multicastSocket.receive(datagramPacket);
+                        } else {
+                            Log.d(TAG, "socket is null");
+                        }
                         Log.d(TAG, "UDP from " + datagramPacket.getAddress().getHostAddress() + " : " + datagramPacket.getPort());
                         byte[] receiveBytes = datagramPacket.getData();
                         EmergencyProtocol protocol = UnPackEmergencyProtocol.unPack(receiveBytes,
