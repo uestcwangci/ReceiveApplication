@@ -22,11 +22,14 @@ import java.net.SocketException;
 import java.util.Enumeration;
 
 public class ForeService extends Service {
+    private static final String TAG = "waibao";
     private static final String ID = "channel_1";
     private static final String NAME = "前台服务";
     private Client client;
 
     private Messenger mMessenger;
+
+    private int udpPort;
 
 
     public ForeService() {
@@ -47,7 +50,9 @@ public class ForeService extends Service {
         Log.d("waibao", "onStartCommand: ");
         if (mMessenger == null) {
             mMessenger = (Messenger) intent.getExtras().get("messenger");
-            client = new Client("192.168.0.116", 10041, 7788, mMessenger);
+            udpPort = intent.getExtras().getInt("port");
+            Log.d(TAG, String.valueOf(udpPort));
+            client = new Client("192.168.43.109", 10041, udpPort, mMessenger);
         }
         client.start();
         return super.onStartCommand(intent, flags, startId);

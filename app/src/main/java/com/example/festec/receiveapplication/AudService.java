@@ -28,6 +28,8 @@ public class AudService extends Service {
 
     private boolean isRun = false;
 
+    private int udpPort;
+
     private byte[] buffer;
     private AudioTrack audioTrk;
 
@@ -45,8 +47,9 @@ public class AudService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        udpPort = intent.getExtras().getInt("port") + 1;
         try {
-            datagramSocket = new DatagramSocket(7777);
+            datagramSocket = new DatagramSocket(udpPort);
         } catch (SocketException e) {
             e.printStackTrace();
         }
